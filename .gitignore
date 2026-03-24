@@ -1,0 +1,35 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv/
+
+# Environment files
+.env
+
+# Tool caches and temp directories
+.uv-cache/
+.tmp/
+.pytest_cache/
+.pytest_cache_local/
+.pytest_tmp/
+/pytest-cache-files-*/
+/tmp*/
+
+# Jupyter
+.ipynb_checkpoints/
+!/notebooks/*.ipynb
+
+# Local data and generated media
+/data/chunks/
+/data/input/
+/data/output/
+/notebooks/meeting_chunks/
+/notebooks/output.mp3
+/notebooks/normalized.wav
+/Zeno Minutes.mp4

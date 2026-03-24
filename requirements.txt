@@ -1,0 +1,7 @@
+fastapi
+pydantic
+fastapi-clerk-auth
+moviepy
+openai
+openai-agents
+python-dotenv
