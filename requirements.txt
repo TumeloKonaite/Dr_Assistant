@@ -5,3 +5,5 @@ moviepy
 openai
 openai-agents
 python-dotenv
+ipykernel
+pytest
