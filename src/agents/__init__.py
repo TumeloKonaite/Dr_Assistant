@@ -3,6 +3,7 @@ __all__ = [
     "retrieval_agent",
     "differential_agent",
     "planner_agent",
+    "documentation_agent",
 ]
 
 
@@ -23,4 +24,8 @@ def __getattr__(name: str):
         from src.agents.planner_agent import planner_agent
 
         return planner_agent
+    if name == "documentation_agent":
+        from src.agents.documentation_agent import documentation_agent
+
+        return documentation_agent
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

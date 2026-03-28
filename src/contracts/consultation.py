@@ -155,12 +155,55 @@ class SoapNote(ContractModel):
     )
 
 
+class PatientSummary(ContractModel):
+    what_was_discussed: str = Field(min_length=1)
+    what_the_doctor_may_check_next: list[str] = Field(default_factory=list)
+    what_you_should_do_next: list[str] = Field(default_factory=list)
+    when_to_get_urgent_help: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "what_was_discussed": "You described sudden chest tightness, shortness of breath, and nausea that started about two hours ago.",
+                "what_the_doctor_may_check_next": [
+                    "An ECG and blood tests to look for heart strain or injury.",
+                    "A chest X-ray if the doctor needs to check your lungs or other causes of chest pain.",
+                ],
+                "what_you_should_do_next": [
+                    "Get urgent in-person medical assessment today.",
+                    "Follow the clinician's instructions for immediate evaluation and testing.",
+                ],
+                "when_to_get_urgent_help": [
+                    "Chest pain that gets worse or does not settle.",
+                    "Fainting, severe trouble breathing, or new shortness of breath at rest.",
+                ],
+            }
+        }
+    )
+
+
+class DocumentationBundle(ContractModel):
+    soap_note: SoapNote
+    patient_summary: PatientSummary
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "soap_note": SoapNote.model_config["json_schema_extra"]["example"],
+                "patient_summary": PatientSummary.model_config["json_schema_extra"][
+                    "example"
+                ],
+            }
+        }
+    )
+
+
 class FinalConsultationBundle(ContractModel):
     case: ConsultationCase
     differentials: list[DifferentialDiagnosis] = Field(default_factory=list)
     care_plan: CarePlan
     soap_note: SoapNote
-    patient_summary: str = Field(min_length=1)
+    patient_summary: PatientSummary
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -186,7 +229,9 @@ class FinalConsultationBundle(ContractModel):
                 ],
                 "care_plan": CarePlan.model_config["json_schema_extra"]["example"],
                 "soap_note": SoapNote.model_config["json_schema_extra"]["example"],
-                "patient_summary": "Your symptoms could represent a serious heart or lung problem, so you should get urgent in-person evaluation today.",
+                "patient_summary": PatientSummary.model_config["json_schema_extra"][
+                    "example"
+                ],
             }
         }
     )
