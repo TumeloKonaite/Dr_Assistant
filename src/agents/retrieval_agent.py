@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-from agents import Agent, function_tool
+from src.agents._compat import Agent, function_tool
 
-from src.contracts.consultation import ConsultationCase
+from src.contracts.consultation import ConsultationCase, RetrievedCondition
 from src.tools.illness_retrieval_tool import retrieve_conditions
 
 
 @function_tool
-def retrieve_conditions_tool(case: dict, top_k: int = 5) -> list[dict]:
+def retrieve_conditions_tool(
+    case: ConsultationCase,
+    top_k: int = 5,
+) -> list[RetrievedCondition]:
     """
     Retrieve relevant illness candidates for a structured consultation case.
     Retrieval only: no diagnosis, treatment, or next-step planning.
     """
-    parsed_case = ConsultationCase.model_validate(case)
-    results = retrieve_conditions(parsed_case, top_k=top_k)
-    return [result.model_dump() for result in results]
+    return retrieve_conditions(case, top_k=top_k)
 
 
 retrieval_agent = Agent(
