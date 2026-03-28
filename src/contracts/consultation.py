@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-Likelihood = Literal["high", "medium", "low"]
+Likelihood = Literal["high", "moderate", "lower"]
 
 
 class ContractModel(BaseModel):
@@ -63,18 +63,32 @@ class RetrievedCondition(ContractModel):
 
 
 class DifferentialDiagnosis(ContractModel):
-    condition: str = Field(min_length=1)
+    condition_name: str = Field(min_length=1)
     likelihood: Likelihood
     reasoning: str = Field(min_length=1)
+    supporting_findings: list[str] = Field(default_factory=list)
+    conflicting_findings: list[str] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
+    recommended_tests: list[str] = Field(default_factory=list)
+    urgency: str | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "condition": "acute coronary syndrome",
+                "condition_name": "acute coronary syndrome",
                 "likelihood": "high",
-                "reasoning": "Chest pain with shortness of breath and nausea raises concern for cardiac ischemia.",
+                "reasoning": "Chest pain with shortness of breath and nausea makes acute coronary syndrome an important consideration, but the available information is still incomplete.",
+                "supporting_findings": [
+                    "sudden chest tightness",
+                    "shortness of breath",
+                    "nausea",
+                ],
+                "conflicting_findings": [
+                    "No ECG, troponin, or exam findings are available yet.",
+                ],
                 "missing_information": ["ECG findings", "troponin result", "radiation of pain"],
+                "recommended_tests": ["ECG", "troponin"],
+                "urgency": "urgent evaluation should be considered because chest pain and dyspnea can reflect a time-sensitive cardiopulmonary condition",
             }
         }
     )
@@ -82,17 +96,42 @@ class DifferentialDiagnosis(ContractModel):
 
 class CarePlan(ContractModel):
     suggested_tests: list[str] = Field(default_factory=list)
-    referrals: list[str] = Field(default_factory=list)
-    follow_up: str = Field(min_length=1)
+    suggested_referrals: list[str] = Field(default_factory=list)
+    follow_up: list[str] = Field(default_factory=list)
     red_flags: list[str] = Field(default_factory=list)
+    patient_advice: list[str] = Field(default_factory=list)
+    rationale: str = Field(min_length=1)
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "suggested_tests": ["ECG", "troponin", "chest X-ray"],
-                "referrals": ["Emergency department", "Cardiology"],
-                "follow_up": "Immediate emergency evaluation is recommended today.",
+                "suggested_referrals": ["Emergency department", "Cardiology"],
+                "follow_up": [
+                    "Arrange urgent same-day in-person assessment.",
+                    "Reassess promptly after initial testing to narrow the differential.",
+                ],
                 "red_flags": ["worsening chest pain", "syncope", "new shortness of breath at rest"],
+                "patient_advice": [
+                    "Seek urgent medical review if symptoms intensify or new concerning symptoms develop.",
+                ],
+                "rationale": "The plan prioritizes rapid evaluation for serious cardiopulmonary causes while preserving diagnostic uncertainty.",
+            }
+        }
+    )
+
+
+class ClinicalReasoningOutput(ContractModel):
+    differentials: list[DifferentialDiagnosis] = Field(default_factory=list)
+    care_plan: CarePlan
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "differentials": [
+                    DifferentialDiagnosis.model_config["json_schema_extra"]["example"],
+                ],
+                "care_plan": CarePlan.model_config["json_schema_extra"]["example"],
             }
         }
     )
@@ -130,10 +169,19 @@ class FinalConsultationBundle(ContractModel):
                 "differentials": [
                     DifferentialDiagnosis.model_config["json_schema_extra"]["example"],
                     {
-                        "condition": "pulmonary embolism",
-                        "likelihood": "medium",
-                        "reasoning": "Chest pain and shortness of breath also warrant evaluation for thromboembolic disease.",
+                        "condition_name": "pulmonary embolism",
+                        "likelihood": "moderate",
+                        "reasoning": "Chest pain and shortness of breath also keep pulmonary embolism on the differential, although the history is incomplete.",
+                        "supporting_findings": [
+                            "chest pain",
+                            "shortness of breath",
+                        ],
+                        "conflicting_findings": [
+                            "No oxygen saturation, leg symptoms, or thromboembolic risk history are available.",
+                        ],
                         "missing_information": ["oxygen saturation", "leg swelling", "recent immobility"],
+                        "recommended_tests": ["pulse oximetry", "D-dimer if clinically appropriate"],
+                        "urgency": "urgent assessment should be considered if symptoms are worsening or associated with hypoxia",
                     },
                 ],
                 "care_plan": CarePlan.model_config["json_schema_extra"]["example"],

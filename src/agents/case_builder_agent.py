@@ -1,4 +1,4 @@
-from agents import Agent, function_tool
+from src.agents._compat import Agent, function_tool
 
 from src.tools.case_extraction_tool import extract_consultation_case
 

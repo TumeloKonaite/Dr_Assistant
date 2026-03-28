@@ -1,6 +1,7 @@
 from src.contracts.chunk import Chunk
 from src.contracts.consultation import (
     CarePlan,
+    ClinicalReasoningOutput,
     ConsultationCase,
     ContractModel,
     DifferentialDiagnosis,
@@ -13,6 +14,7 @@ from src.contracts.transcript import TranscriptChunk
 
 __all__ = [
     "CarePlan",
+    "ClinicalReasoningOutput",
     "Chunk",
     "ConsultationCase",
     "ContractModel",

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from src.contracts import (
     CarePlan,
+    ClinicalReasoningOutput,
     ConsultationCase,
     DifferentialDiagnosis,
     FinalConsultationBundle,
@@ -54,16 +55,22 @@ def test_all_contract_models_accept_valid_payloads():
         "score": 0.81,
     }
     differential_payload = {
-        "condition": "gastritis",
-        "likelihood": "medium",
-        "reasoning": "Symptoms and history are compatible with gastritis.",
+        "condition_name": "gastritis",
+        "likelihood": "moderate",
+        "reasoning": "Symptoms and history make gastritis a plausible explanation, but the available information is limited.",
+        "supporting_findings": ["abdominal pain", "nausea", "history of gastritis"],
+        "conflicting_findings": ["No abdominal exam findings are available."],
         "missing_information": ["GI bleeding symptoms"],
+        "recommended_tests": ["CBC"],
+        "urgency": None,
     }
     care_plan_payload = {
         "suggested_tests": ["CBC"],
-        "referrals": ["Primary care"],
-        "follow_up": "Follow up within 48 hours if symptoms persist.",
+        "suggested_referrals": ["Primary care"],
+        "follow_up": ["Follow up within 48 hours if symptoms persist."],
         "red_flags": ["hematemesis", "melena"],
+        "patient_advice": ["Seek urgent review if pain worsens or bleeding occurs."],
+        "rationale": "The next steps focus on clarifying the cause of abdominal pain while monitoring for bleeding or clinical deterioration.",
     }
     soap_note_payload = {
         "subjective": "Patient reports abdominal pain and nausea.",
@@ -89,10 +96,19 @@ def test_all_contract_models_accept_valid_payloads():
 
     assert case.chief_complaint == "Abdominal pain"
     assert retrieved_condition.score == 0.81
-    assert differential.likelihood == "medium"
-    assert care_plan.follow_up == "Follow up within 48 hours if symptoms persist."
+    assert differential.likelihood == "moderate"
+    assert care_plan.follow_up == ["Follow up within 48 hours if symptoms persist."]
     assert soap_note.assessment == "Gastritis is a possible cause of symptoms."
     assert bundle.case.patient_id == "P-2001"
+
+    reasoning_output = ClinicalReasoningOutput.model_validate(
+        {
+            "differentials": [differential_payload],
+            "care_plan": care_plan_payload,
+        }
+    )
+
+    assert reasoning_output.differentials[0].condition_name == "gastritis"
 
 
 def test_consultation_case_rejects_extra_fields():
@@ -113,14 +129,17 @@ def test_final_consultation_bundle_rejects_nested_extra_fields():
         FinalConsultationBundle.model_validate(payload)
 
 
-@pytest.mark.parametrize("likelihood", ["very high", "HIGH", ""])
+@pytest.mark.parametrize("likelihood", ["very high", "HIGH", "medium", ""])
 def test_differential_diagnosis_rejects_invalid_likelihood(likelihood: str):
     with pytest.raises(ValidationError, match="literal_error"):
         DifferentialDiagnosis(
-            condition="migraine",
+            condition_name="migraine",
             likelihood=likelihood,
             reasoning="Symptoms are compatible with migraine.",
+            supporting_findings=["headache"],
+            conflicting_findings=[],
             missing_information=["neurologic exam"],
+            recommended_tests=[],
         )
 
 
@@ -146,11 +165,13 @@ def test_differential_diagnosis_rejects_invalid_likelihood(likelihood: str):
         (
             lambda: CarePlan(
                 suggested_tests=["CBC"],
-                referrals=["Primary care"],
-                follow_up="",
+                suggested_referrals=["Primary care"],
+                follow_up=["Follow up within 48 hours."],
                 red_flags=["worsening pain"],
+                patient_advice=[],
+                rationale="",
             ),
-            "follow_up",
+            "rationale",
         ),
         (
             lambda: SoapNote(
@@ -190,10 +211,13 @@ def test_differential_diagnosis_rejects_invalid_likelihood(likelihood: str):
         ),
         (
             lambda: DifferentialDiagnosis(
-                condition="viral syndrome",
-                likelihood="low",
+                condition_name="viral syndrome",
+                likelihood="lower",
                 reasoning="",
+                supporting_findings=["fever"],
+                conflicting_findings=[],
                 missing_information=["temperature"],
+                recommended_tests=[],
             ),
             "reasoning",
         ),
@@ -207,9 +231,11 @@ def test_differential_diagnosis_rejects_invalid_likelihood(likelihood: str):
                 differentials=[],
                 care_plan=CarePlan(
                     suggested_tests=[],
-                    referrals=[],
-                    follow_up="Monitor symptoms over 24 hours.",
+                    suggested_referrals=[],
+                    follow_up=["Monitor symptoms over 24 hours."],
                     red_flags=[],
+                    patient_advice=[],
+                    rationale="Monitor and reassess if symptoms evolve.",
                 ),
                 soap_note=SoapNote(
                     subjective="Fever since yesterday.",
@@ -235,7 +261,7 @@ def test_final_consultation_bundle_fixture_validates():
 
     assert bundle.case.chief_complaint == "Chest pain"
     assert bundle.differentials[0].likelihood == "high"
-    assert bundle.care_plan.follow_up == "Immediate emergency evaluation is recommended today."
+    assert bundle.care_plan.follow_up[0] == "Arrange urgent same-day in-person assessment."
 
 
 def test_final_consultation_bundle_round_trips_from_json():
@@ -247,7 +273,7 @@ def test_final_consultation_bundle_round_trips_from_json():
 
     assert dumped["case"]["patient_id"] == "P-1024"
     assert dumped["soap_note"]["assessment"] == "Symptoms are concerning for acute coronary syndrome."
-    assert dumped["differentials"][1]["condition"] == "pulmonary embolism"
+    assert dumped["differentials"][1]["condition_name"] == "pulmonary embolism"
 
 
 def test_consultation_case_schema_exposes_example_json():
