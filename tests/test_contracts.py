@@ -8,8 +8,10 @@ from src.contracts import (
     CarePlan,
     ClinicalReasoningOutput,
     ConsultationCase,
+    DocumentationBundle,
     DifferentialDiagnosis,
     FinalConsultationBundle,
+    PatientSummary,
     RetrievedCondition,
     SoapNote,
 )
@@ -78,19 +80,32 @@ def test_all_contract_models_accept_valid_payloads():
         "assessment": "Gastritis is a possible cause of symptoms.",
         "plan": "Provide supportive care guidance and reassess if symptoms worsen.",
     }
+    patient_summary_payload = {
+        "what_was_discussed": "You reported abdominal pain and nausea since yesterday.",
+        "what_the_doctor_may_check_next": ["Blood tests if symptoms continue."],
+        "what_you_should_do_next": ["Follow up within 48 hours if symptoms persist."],
+        "when_to_get_urgent_help": ["Seek urgent help if vomiting blood or black stools occur."],
+    }
 
     case = ConsultationCase.model_validate(case_payload)
     retrieved_condition = RetrievedCondition.model_validate(retrieved_condition_payload)
     differential = DifferentialDiagnosis.model_validate(differential_payload)
     care_plan = CarePlan.model_validate(care_plan_payload)
     soap_note = SoapNote.model_validate(soap_note_payload)
+    patient_summary = PatientSummary.model_validate(patient_summary_payload)
+    documentation_bundle = DocumentationBundle.model_validate(
+        {
+            "soap_note": soap_note_payload,
+            "patient_summary": patient_summary_payload,
+        }
+    )
     bundle = FinalConsultationBundle.model_validate(
         {
             "case": case_payload,
             "differentials": [differential_payload],
             "care_plan": care_plan_payload,
             "soap_note": soap_note_payload,
-            "patient_summary": "Symptoms may be related to stomach irritation and need follow-up if they continue.",
+            "patient_summary": patient_summary_payload,
         }
     )
 
@@ -99,6 +114,10 @@ def test_all_contract_models_accept_valid_payloads():
     assert differential.likelihood == "moderate"
     assert care_plan.follow_up == ["Follow up within 48 hours if symptoms persist."]
     assert soap_note.assessment == "Gastritis is a possible cause of symptoms."
+    assert patient_summary.what_was_discussed == "You reported abdominal pain and nausea since yesterday."
+    assert documentation_bundle.patient_summary.what_you_should_do_next == [
+        "Follow up within 48 hours if symptoms persist."
+    ]
     assert bundle.case.patient_id == "P-2001"
 
     reasoning_output = ClinicalReasoningOutput.model_validate(
@@ -222,30 +241,13 @@ def test_differential_diagnosis_rejects_invalid_likelihood(likelihood: str):
             "reasoning",
         ),
         (
-            lambda: FinalConsultationBundle(
-                case=ConsultationCase(
-                    chief_complaint="Fever",
-                    symptoms=["fever"],
-                    transcript="Patient reports fever.",
-                ),
-                differentials=[],
-                care_plan=CarePlan(
-                    suggested_tests=[],
-                    suggested_referrals=[],
-                    follow_up=["Monitor symptoms over 24 hours."],
-                    red_flags=[],
-                    patient_advice=[],
-                    rationale="Monitor and reassess if symptoms evolve.",
-                ),
-                soap_note=SoapNote(
-                    subjective="Fever since yesterday.",
-                    objective="No exam findings available.",
-                    assessment="Likely viral illness.",
-                    plan="Hydration and rest.",
-                ),
-                patient_summary="",
+            lambda: PatientSummary(
+                what_was_discussed="",
+                what_the_doctor_may_check_next=[],
+                what_you_should_do_next=[],
+                when_to_get_urgent_help=[],
             ),
-            "patient_summary",
+            "what_was_discussed",
         ),
     ],
 )
@@ -274,6 +276,10 @@ def test_final_consultation_bundle_round_trips_from_json():
     assert dumped["case"]["patient_id"] == "P-1024"
     assert dumped["soap_note"]["assessment"] == "Symptoms are concerning for acute coronary syndrome."
     assert dumped["differentials"][1]["condition_name"] == "pulmonary embolism"
+    assert (
+        dumped["patient_summary"]["what_was_discussed"]
+        == "You described sudden chest tightness, shortness of breath, and nausea that started about two hours ago."
+    )
 
 
 def test_consultation_case_schema_exposes_example_json():

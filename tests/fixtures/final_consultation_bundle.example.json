@@ -101,5 +101,19 @@
     "assessment": "Symptoms are concerning for acute coronary syndrome.",
     "plan": "Advise immediate emergency evaluation, cardiac workup, and escalation if symptoms worsen."
   },
-  "patient_summary": "Your symptoms could represent a serious heart or lung problem, so you should get urgent in-person evaluation today."
+  "patient_summary": {
+    "what_was_discussed": "You described sudden chest tightness, shortness of breath, and nausea that started about two hours ago.",
+    "what_the_doctor_may_check_next": [
+      "An ECG and blood tests to look for heart strain or injury.",
+      "A chest X-ray if the doctor needs to check your lungs or other causes of chest pain."
+    ],
+    "what_you_should_do_next": [
+      "Get urgent in-person medical assessment today.",
+      "Follow the clinician's instructions for immediate evaluation and testing."
+    ],
+    "when_to_get_urgent_help": [
+      "Chest pain that gets worse or does not settle.",
+      "Fainting, severe trouble breathing, or new shortness of breath at rest."
+    ]
+  }
 }
