@@ -20,8 +20,8 @@ OBJECTIVE_DATA_DISCLAIMER = (
 )
 
 MEDICATION_OR_DOSING_PATTERNS = (
-    r"\b(start|take|prescribe|prescribed|begin|use)\b.{0,40}\b(amoxicillin|azithromycin|ibuprofen|acetaminophen|paracetamol|prednisone|metformin|aspirin)\b",
-    r"\b(start|take|prescribe|prescribed|begin|use)\b.{0,60}\b\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml)\b",
+    r"\b(start|take|prescribe|prescribed|begin|continue|stop|increase|decrease|adjust)\b.{0,40}\b(amoxicillin|azithromycin|ibuprofen|acetaminophen|paracetamol|prednisone|metformin|aspirin)\b",
+    r"\b(start|take|prescribe|prescribed|begin|continue|stop|increase|decrease|adjust)\b.{0,60}\b\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml)\b",
     r"\b\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml)\b.{0,40}\b(once daily|twice daily|three times daily|daily|every \d+ (?:hours?|hrs?|days?))\b",
     r"\b(amoxicillin|azithromycin|ibuprofen|acetaminophen|paracetamol|prednisone|metformin|aspirin)\b.{0,40}\b\d+(?:\.\d+)?\s?(?:mg|mcg|g|ml)\b",
 )
@@ -31,11 +31,25 @@ DEFINITIVE_PREFIX_PATTERNS = (
     r"\bdiagnosis is\b",
     r"\bconfirmed\b",
 )
+NON_DEFINITIVE_CONTEXT_PATTERNS = (
+    r"\b(?:the )?patient has a history of\b",
+    r"\byou have a history of\b",
+    r"\bhistory of\b",
+    r"\bpossible\b",
+    r"\bplausible\b",
+    r"\bmay be\b",
+    r"\bmight be\b",
+    r"\bcould be\b",
+    r"\bremains\b",
+)
 INVENTED_OBJECTIVE_PATTERNS = (
     r"\b(?:vitals?|vital signs?)\b.{0,30}\b(?:show|shows|showed|were|was)\b",
-    r"\b(?:blood pressure|bp|heart rate|pulse|respiratory rate|temperature|temp|spo2|oxygen saturation)\b.{0,20}(?:\d|normal|low|high)",
     r"\b(?:labs?|blood tests?|imaging|x-ray|ct|mri|ultrasound)\b.{0,25}\b(?:show|shows|showed|revealed|demonstrated)\b",
     r"\b(?:on examination|exam(?:ination)? (?:shows|showed|revealed)|neurologic exam (?:shows|showed|revealed|was)|lungs? (?:are|were)|abdomen (?:is|was))\b",
+)
+MEASUREMENT_REFERENCE_PATTERNS = (
+    r"\b(?:blood pressure|bp)\b.{0,20}\b\d{2,3}\s*/\s*\d{2,3}\b",
+    r"\b(?:heart rate|pulse|respiratory rate|temperature|temp|spo2|oxygen saturation)\b.{0,20}(?:\d|normal|low|high)",
 )
 UNSUPPORTED_DISPOSITION_PATTERNS = (
     r"\bdischarge home\b",
@@ -116,6 +130,11 @@ def _contains_definitive_condition_claim(
             re.search(pattern, normalized, re.IGNORECASE) for pattern in DEFINITIVE_PREFIX_PATTERNS
         ):
             continue
+        if any(
+            re.search(pattern, normalized, re.IGNORECASE)
+            for pattern in NON_DEFINITIVE_CONTEXT_PATTERNS
+        ):
+            continue
         if any(condition_name in normalized for condition_name in condition_names):
             return chunk
     return None
@@ -126,6 +145,45 @@ def _patient_summary_mentions_flag(summary_text: str, red_flag: DetectedRedFlag)
     return any(term.lower() in normalized for term in red_flag.patient_summary_terms)
 
 
+def _source_chunks(case: ConsultationCase) -> list[str]:
+    return [
+        case.chief_complaint,
+        *case.symptoms,
+        case.duration or "",
+        case.severity or "",
+        *case.medications,
+        *case.allergies,
+        *case.history,
+        *case.risk_factors,
+        case.transcript,
+    ]
+
+
+def _measurement_tokens(text: str) -> set[str]:
+    normalized = re.sub(
+        r"\b(\d{2,3})\s+over\s+(\d{2,3})\b",
+        r"\1/\2",
+        text.lower(),
+    )
+    tokens = set(re.findall(r"\b\d{2,3}\s*/\s*\d{2,3}\b", normalized))
+    tokens.update(re.findall(r"\b\d+(?:\.\d+)?\b", normalized))
+    return tokens
+
+
+def _measurement_reference_supported(case: ConsultationCase, chunk: str) -> bool:
+    source_text = re.sub(
+        r"\b(\d{2,3})\s+over\s+(\d{2,3})\b",
+        r"\1/\2",
+        " ".join(part for part in _source_chunks(case) if part).lower(),
+    )
+    chunk_measurements = _measurement_tokens(chunk)
+
+    if not chunk_measurements:
+        return False
+
+    return all(token in source_text for token in chunk_measurements)
+
+
 def check_generated_outputs(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
@@ -134,7 +192,6 @@ def check_generated_outputs(
     patient_summary: PatientSummary,
     detected_red_flags: list[DetectedRedFlag] | None = None,
 ) -> list[SafetyIssue]:
-    del case
     issues: list[SafetyIssue] = []
     chunks = _text_chunks(differentials, care_plan, soap_note, patient_summary)
     all_chunks = [chunk for source_chunks in chunks.values() for chunk in source_chunks]
@@ -160,6 +217,22 @@ def check_generated_outputs(
                 source="generated_outputs",
                 message="Generated output introduces vitals, labs, imaging, or examination findings that are not present in the source inputs.",
                 evidence=[invented_objective],
+            )
+        )
+
+    measurement_reference = _first_match(all_chunks, MEASUREMENT_REFERENCE_PATTERNS)
+    if (
+        measurement_reference
+        and measurement_reference != OBJECTIVE_DATA_DISCLAIMER
+        and not _measurement_reference_supported(case, measurement_reference)
+    ):
+        issues.append(
+            SafetyIssue(
+                code="invented_objective_data",
+                severity="blocker",
+                source="generated_outputs",
+                message="Generated output introduces vitals, labs, imaging, or examination findings that are not present in the source inputs.",
+                evidence=[measurement_reference],
             )
         )
 
