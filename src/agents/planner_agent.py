@@ -14,9 +14,18 @@ from src.tools.differential_generation_tool import generate_differentials
 def run_planner(
     case: ConsultationCase,
     retrieved: list[RetrievedCondition],
+    safety_context: str | None = None,
 ) -> ClinicalReasoningOutput:
-    differentials = generate_differentials(case=case, retrieved=retrieved)
-    care_plan = generate_care_plan(case=case, differentials=differentials)
+    differentials = generate_differentials(
+        case=case,
+        retrieved=retrieved,
+        safety_context=safety_context,
+    )
+    care_plan = generate_care_plan(
+        case=case,
+        differentials=differentials,
+        safety_context=safety_context,
+    )
     return ClinicalReasoningOutput(
         differentials=differentials,
         care_plan=care_plan,
@@ -27,12 +36,13 @@ def run_planner(
 def planner_tool(
     case: ConsultationCase,
     retrieved: list[RetrievedCondition],
+    safety_context: str | None = None,
 ) -> ClinicalReasoningOutput:
     """
     Generate structured differential reasoning and a care plan for a
     consultation case.
     """
-    return run_planner(case, retrieved)
+    return run_planner(case, retrieved, safety_context=safety_context)
 
 
 planner_agent = Agent(

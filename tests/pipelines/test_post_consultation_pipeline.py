@@ -11,12 +11,15 @@ from src.contracts.consultation import (
     CarePlan,
     ClinicalReasoningOutput,
     ConsultationCase,
+    DetectedRedFlag,
     DocumentationBundle,
     DifferentialDiagnosis,
     FinalConsultationBundle,
     PatientSummary,
     RetrievedCondition,
+    SafetyIssue,
     SoapNote,
+    UncertaintyAssessment,
 )
 from src.pipelines.post_consultation_pipeline import (
     PipelineStepError,
@@ -92,6 +95,20 @@ def make_documentation() -> DocumentationBundle:
     )
 
 
+def make_uncertainty_assessment(
+    issues: list[SafetyIssue] | None = None,
+) -> UncertaintyAssessment:
+    return UncertaintyAssessment(
+        evidence_level="adequate",
+        confidence_alignment="aligned",
+        explicit_uncertainty_present=True,
+        missing_information_documented=True,
+        supported_high_likelihood_differentials=True,
+        summary="Confidence is proportional to the available evidence.",
+        issues=issues or [],
+    )
+
+
 def make_workspace_dir(prefix: str) -> Path:
     path = Path(".tmp") / f"{prefix}-{uuid4().hex}"
     path.mkdir(parents=True, exist_ok=True)
@@ -123,11 +140,15 @@ def test_run_post_consultation_pipeline_returns_bundle_and_writes_outputs(
         )
         monkeypatch.setattr(
             "src.pipelines.post_consultation_pipeline.run_planner",
-            lambda extracted_case, retrieved_conditions: reasoning,
+            lambda extracted_case, retrieved_conditions, safety_context: reasoning,
         )
         monkeypatch.setattr(
             "src.pipelines.post_consultation_pipeline.run_documentation",
-            lambda extracted_case, differentials, care_plan: documentation,
+            lambda extracted_case, differentials, care_plan, safety_context: documentation,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.assess_uncertainty",
+            lambda extracted_case, differentials: make_uncertainty_assessment(),
         )
 
         output_dir = workspace_dir / "outputs"
@@ -143,6 +164,8 @@ def test_run_post_consultation_pipeline_returns_bundle_and_writes_outputs(
         assert bundle.care_plan == reasoning.care_plan
         assert bundle.soap_note == documentation.soap_note
         assert bundle.patient_summary == documentation.patient_summary
+        assert bundle.safety is not None
+        assert bundle.safety.status == "clear"
 
         expected_files = [
             "transcript.txt",
@@ -152,6 +175,7 @@ def test_run_post_consultation_pipeline_returns_bundle_and_writes_outputs(
             "plan.json",
             "soap.md",
             "patient_summary.md",
+            "safety.json",
             "final_bundle.json",
             "metadata.json",
         ]
@@ -164,11 +188,13 @@ def test_run_post_consultation_pipeline_returns_bundle_and_writes_outputs(
         )
         assert final_bundle_payload["case"]["chief_complaint"] == "Headache"
         assert final_bundle_payload["differentials"][0]["condition_name"] == "migraine"
+        assert final_bundle_payload["safety"]["status"] == "clear"
 
         metadata = json.loads((output_dir / "metadata.json").read_text(encoding="utf-8"))
         assert metadata["status"] == "completed"
         assert metadata["doctor_notes_provided"] is True
         assert "final_bundle" in metadata["artifacts"]
+        assert "safety" in metadata["artifacts"]
     finally:
         shutil.rmtree(workspace_dir, ignore_errors=True)
 
@@ -226,5 +252,157 @@ def test_run_post_consultation_pipeline_wraps_step_failures_and_stops(
         assert metadata["status"] == "failed"
         assert metadata["failed_step"] == "case_extraction"
         assert "model unavailable" in metadata["error"]
+    finally:
+        shutil.rmtree(workspace_dir, ignore_errors=True)
+
+
+def test_run_post_consultation_pipeline_continues_on_warning_level_safety_issues(
+    monkeypatch,
+):
+    transcript = "Patient reports 3 days of headache and fatigue."
+    case = make_case()
+    retrieved = make_retrieved()
+    reasoning = make_reasoning()
+    documentation = make_documentation()
+    workspace_dir = make_workspace_dir("post-consultation-warning")
+
+    try:
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.transcribe_consultation",
+            lambda file_path: transcript,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.extract_consultation_case",
+            lambda transcript_text, doctor_notes: case,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.retrieve_conditions",
+            lambda extracted_case: retrieved,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.run_planner",
+            lambda extracted_case, retrieved_conditions, safety_context: reasoning,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.run_documentation",
+            lambda extracted_case, differentials, care_plan, safety_context: documentation,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.check_generated_outputs",
+            lambda **kwargs: [
+                SafetyIssue(
+                    code="red_flag_omission_in_patient_summary",
+                    severity="warning",
+                    source="patient_summary",
+                    message="Patient-facing output does not clearly carry forward an urgent caution.",
+                    evidence=["Headache warning"],
+                )
+            ],
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.assess_uncertainty",
+            lambda extracted_case, differentials: make_uncertainty_assessment(),
+        )
+
+        output_dir = workspace_dir / "outputs"
+        bundle = run_post_consultation_pipeline(
+            file_path="consult.mp4",
+            doctor_notes="Headache started 3 days ago.",
+            output_dir=str(output_dir),
+        )
+
+        assert bundle.safety is not None
+        assert bundle.safety.status == "warning"
+        assert bundle.safety.warning_count == 1
+        assert bundle.safety.blocker_count == 0
+        assert (output_dir / "final_bundle.json").exists()
+        assert (output_dir / "safety.json").exists()
+    finally:
+        shutil.rmtree(workspace_dir, ignore_errors=True)
+
+
+def test_run_post_consultation_pipeline_raises_on_blocker_level_safety_issues(
+    monkeypatch,
+):
+    transcript = "Patient reports chest pain and shortness of breath."
+    case = ConsultationCase(
+        patient_id="P-9002",
+        chief_complaint="Chest pain",
+        symptoms=["chest pain", "shortness of breath"],
+        duration="2 hours",
+        severity="severe",
+        transcript=transcript,
+    )
+    retrieved = make_retrieved()
+    reasoning = make_reasoning()
+    documentation = make_documentation()
+    workspace_dir = make_workspace_dir("post-consultation-blocker")
+
+    try:
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.transcribe_consultation",
+            lambda file_path: transcript,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.extract_consultation_case",
+            lambda transcript_text, doctor_notes: case,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.retrieve_conditions",
+            lambda extracted_case: retrieved,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.run_planner",
+            lambda extracted_case, retrieved_conditions, safety_context: reasoning,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.run_documentation",
+            lambda extracted_case, differentials, care_plan, safety_context: documentation,
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.detect_red_flags",
+            lambda extracted_case: [
+                DetectedRedFlag(
+                    code="cardiopulmonary_emergency",
+                    title="Chest pain with dyspnea or syncope",
+                    summary="Chest pain plus shortness of breath or fainting can reflect a time-sensitive cardiopulmonary emergency.",
+                    urgency="emergent",
+                    evidence=["chest pain", "shortness of breath"],
+                    patient_summary_terms=["chest pain", "shortness of breath"],
+                )
+            ],
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.check_generated_outputs",
+            lambda **kwargs: [
+                SafetyIssue(
+                    code="definitive_diagnosis_claim",
+                    severity="blocker",
+                    source="soap_note",
+                    message="Generated output states a definitive diagnosis.",
+                    evidence=["The patient has pneumonia."],
+                )
+            ],
+        )
+        monkeypatch.setattr(
+            "src.pipelines.post_consultation_pipeline.assess_uncertainty",
+            lambda extracted_case, differentials: make_uncertainty_assessment(),
+        )
+
+        output_dir = workspace_dir / "outputs"
+
+        with pytest.raises(PipelineStepError, match="safety_guardrails"):
+            run_post_consultation_pipeline(
+                file_path="consult.mp4",
+                doctor_notes="Chest pain started today.",
+                output_dir=str(output_dir),
+            )
+
+        assert (output_dir / "safety.json").exists()
+        assert not (output_dir / "final_bundle.json").exists()
+
+        metadata = json.loads((output_dir / "metadata.json").read_text(encoding="utf-8"))
+        assert metadata["status"] == "failed"
+        assert metadata["failed_step"] == "safety_guardrails"
     finally:
         shutil.rmtree(workspace_dir, ignore_errors=True)

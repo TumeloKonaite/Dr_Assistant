@@ -40,27 +40,43 @@ def load_patient_summary_prompt() -> str:
 def build_patient_summary_input(
     case: ConsultationCase,
     plan: CarePlan,
+    safety_context: str | None = None,
 ) -> str:
-    return "\n".join(
-        [
-            "CONSULTATION CASE",
-            "-----------------",
-            json.dumps(case.model_dump(mode="json"), indent=2),
-            "",
-            "CARE PLAN",
-            "---------",
-            json.dumps(plan.model_dump(mode="json"), indent=2),
-        ]
-    )
+    sections = [
+        "CONSULTATION CASE",
+        "-----------------",
+        json.dumps(case.model_dump(mode="json"), indent=2),
+        "",
+        "CARE PLAN",
+        "---------",
+        json.dumps(plan.model_dump(mode="json"), indent=2),
+    ]
+
+    if safety_context:
+        sections.extend(
+            [
+                "",
+                "SAFETY CONTEXT",
+                "--------------",
+                safety_context,
+            ]
+        )
+
+    return "\n".join(sections)
 
 
 def generate_patient_summary(
     case: ConsultationCase,
     plan: CarePlan,
+    safety_context: str | None = None,
     model: str = "gpt-5-nano",
 ) -> PatientSummary:
     system_prompt = load_patient_summary_prompt()
-    user_input = build_patient_summary_input(case=case, plan=plan)
+    user_input = build_patient_summary_input(
+        case=case,
+        plan=plan,
+        safety_context=safety_context,
+    )
     client = OpenAI()
 
     try:

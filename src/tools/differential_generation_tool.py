@@ -40,6 +40,7 @@ def load_differential_generation_prompt() -> str:
 def build_differential_generation_input(
     case: ConsultationCase,
     retrieved: list[RetrievedCondition],
+    safety_context: str | None = None,
 ) -> str:
     retrieved_payload: list[dict] | str
     if retrieved:
@@ -47,28 +48,43 @@ def build_differential_generation_input(
     else:
         retrieved_payload = "No retrieved candidate conditions were provided."
 
-    return "\n".join(
-        [
-            "CONSULTATION CASE",
-            "-----------------",
-            json.dumps(case.model_dump(mode="json"), indent=2),
-            "",
-            "RETRIEVED CANDIDATE CONDITIONS",
-            "------------------------------",
-            json.dumps(retrieved_payload, indent=2)
-            if isinstance(retrieved_payload, list)
-            else retrieved_payload,
-        ]
-    )
+    sections = [
+        "CONSULTATION CASE",
+        "-----------------",
+        json.dumps(case.model_dump(mode="json"), indent=2),
+        "",
+        "RETRIEVED CANDIDATE CONDITIONS",
+        "------------------------------",
+        json.dumps(retrieved_payload, indent=2)
+        if isinstance(retrieved_payload, list)
+        else retrieved_payload,
+    ]
+
+    if safety_context:
+        sections.extend(
+            [
+                "",
+                "SAFETY CONTEXT",
+                "--------------",
+                safety_context,
+            ]
+        )
+
+    return "\n".join(sections)
 
 
 def generate_differentials(
     case: ConsultationCase,
     retrieved: list[RetrievedCondition],
+    safety_context: str | None = None,
     model: str = "gpt-5-nano",
 ) -> list[DifferentialDiagnosis]:
     system_prompt = load_differential_generation_prompt()
-    user_input = build_differential_generation_input(case=case, retrieved=retrieved)
+    user_input = build_differential_generation_input(
+        case=case,
+        retrieved=retrieved,
+        safety_context=safety_context,
+    )
     client = OpenAI()
 
     try:

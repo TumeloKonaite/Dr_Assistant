@@ -8,12 +8,16 @@ from src.contracts import (
     CarePlan,
     ClinicalReasoningOutput,
     ConsultationCase,
+    DetectedRedFlag,
     DocumentationBundle,
     DifferentialDiagnosis,
     FinalConsultationBundle,
     PatientSummary,
     RetrievedCondition,
+    SafetyIssue,
+    SafetyReport,
     SoapNote,
+    UncertaintyAssessment,
 )
 
 
@@ -86,6 +90,39 @@ def test_all_contract_models_accept_valid_payloads():
         "what_you_should_do_next": ["Follow up within 48 hours if symptoms persist."],
         "when_to_get_urgent_help": ["Seek urgent help if vomiting blood or black stools occur."],
     }
+    red_flag_payload = {
+        "code": "gi_bleeding",
+        "title": "Possible gastrointestinal bleeding",
+        "summary": "Possible gastrointestinal bleeding symptoms need urgent assessment.",
+        "urgency": "urgent",
+        "evidence": ["GI bleeding symptoms"],
+        "patient_summary_terms": ["vomiting blood", "black stools"],
+    }
+    safety_issue_payload = {
+        "code": "red_flag_omission_in_patient_summary",
+        "severity": "warning",
+        "source": "patient_summary",
+        "message": "Patient-facing output does not clearly carry forward one or more urgent red flags detected upstream.",
+        "evidence": ["Possible gastrointestinal bleeding"],
+    }
+    uncertainty_payload = {
+        "evidence_level": "limited",
+        "confidence_alignment": "aligned",
+        "explicit_uncertainty_present": True,
+        "missing_information_documented": True,
+        "supported_high_likelihood_differentials": True,
+        "summary": "The case has limited evidence, but uncertainty remains explicit.",
+        "issues": [safety_issue_payload],
+    }
+    safety_report_payload = {
+        "status": "warning",
+        "red_flags": [red_flag_payload],
+        "red_flag_summary": "Urgent red flags detected: Possible gastrointestinal bleeding.",
+        "issues": [safety_issue_payload],
+        "uncertainty_assessment": uncertainty_payload,
+        "warning_count": 1,
+        "blocker_count": 0,
+    }
 
     case = ConsultationCase.model_validate(case_payload)
     retrieved_condition = RetrievedCondition.model_validate(retrieved_condition_payload)
@@ -93,6 +130,10 @@ def test_all_contract_models_accept_valid_payloads():
     care_plan = CarePlan.model_validate(care_plan_payload)
     soap_note = SoapNote.model_validate(soap_note_payload)
     patient_summary = PatientSummary.model_validate(patient_summary_payload)
+    red_flag = DetectedRedFlag.model_validate(red_flag_payload)
+    safety_issue = SafetyIssue.model_validate(safety_issue_payload)
+    uncertainty_assessment = UncertaintyAssessment.model_validate(uncertainty_payload)
+    safety_report = SafetyReport.model_validate(safety_report_payload)
     documentation_bundle = DocumentationBundle.model_validate(
         {
             "soap_note": soap_note_payload,
@@ -106,6 +147,7 @@ def test_all_contract_models_accept_valid_payloads():
             "care_plan": care_plan_payload,
             "soap_note": soap_note_payload,
             "patient_summary": patient_summary_payload,
+            "safety": safety_report_payload,
         }
     )
 
@@ -115,10 +157,15 @@ def test_all_contract_models_accept_valid_payloads():
     assert care_plan.follow_up == ["Follow up within 48 hours if symptoms persist."]
     assert soap_note.assessment == "Gastritis is a possible cause of symptoms."
     assert patient_summary.what_was_discussed == "You reported abdominal pain and nausea since yesterday."
+    assert red_flag.urgency == "urgent"
+    assert safety_issue.severity == "warning"
+    assert uncertainty_assessment.evidence_level == "limited"
+    assert safety_report.warning_count == 1
     assert documentation_bundle.patient_summary.what_you_should_do_next == [
         "Follow up within 48 hours if symptoms persist."
     ]
     assert bundle.case.patient_id == "P-2001"
+    assert bundle.safety is not None
 
     reasoning_output = ClinicalReasoningOutput.model_validate(
         {

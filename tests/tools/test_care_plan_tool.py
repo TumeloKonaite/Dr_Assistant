@@ -70,6 +70,17 @@ def test_build_care_plan_input_handles_missing_differentials():
     assert "No differential diagnoses were provided." in payload
 
 
+def test_build_care_plan_input_includes_safety_context_when_provided():
+    payload = build_care_plan_input(
+        make_case(),
+        make_differentials(),
+        safety_context="Urgent red flags detected: Chest pain with dyspnea or syncope.",
+    )
+
+    assert "SAFETY CONTEXT" in payload
+    assert "Chest pain with dyspnea or syncope" in payload
+
+
 def test_generate_care_plan_returns_typed_contract():
     fake_response = Mock()
     fake_response.output_parsed = CarePlanResponse(care_plan=make_care_plan())

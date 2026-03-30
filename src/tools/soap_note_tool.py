@@ -44,6 +44,7 @@ def build_soap_note_input(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
     plan: CarePlan,
+    safety_context: str | None = None,
 ) -> str:
     differential_payload: list[dict] | str
     if differentials:
@@ -51,37 +52,53 @@ def build_soap_note_input(
     else:
         differential_payload = "No differential diagnoses were provided."
 
-    return "\n".join(
-        [
-            "CONSULTATION CASE",
-            "-----------------",
-            json.dumps(case.model_dump(mode="json"), indent=2),
-            "",
-            "DIFFERENTIAL DIAGNOSIS LIST",
-            "---------------------------",
-            json.dumps(differential_payload, indent=2)
-            if isinstance(differential_payload, list)
-            else differential_payload,
-            "",
-            "CARE PLAN",
-            "---------",
-            json.dumps(plan.model_dump(mode="json"), indent=2),
-            "",
-            "OBJECTIVE DATA STATUS",
-            "---------------------",
-            OBJECTIVE_FALLBACK,
-        ]
-    )
+    sections = [
+        "CONSULTATION CASE",
+        "-----------------",
+        json.dumps(case.model_dump(mode="json"), indent=2),
+        "",
+        "DIFFERENTIAL DIAGNOSIS LIST",
+        "---------------------------",
+        json.dumps(differential_payload, indent=2)
+        if isinstance(differential_payload, list)
+        else differential_payload,
+        "",
+        "CARE PLAN",
+        "---------",
+        json.dumps(plan.model_dump(mode="json"), indent=2),
+        "",
+        "OBJECTIVE DATA STATUS",
+        "---------------------",
+        OBJECTIVE_FALLBACK,
+    ]
+
+    if safety_context:
+        sections.extend(
+            [
+                "",
+                "SAFETY CONTEXT",
+                "--------------",
+                safety_context,
+            ]
+        )
+
+    return "\n".join(sections)
 
 
 def generate_soap(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
     plan: CarePlan,
+    safety_context: str | None = None,
     model: str = "gpt-5-nano",
 ) -> SoapNote:
     system_prompt = load_soap_note_prompt()
-    user_input = build_soap_note_input(case=case, differentials=differentials, plan=plan)
+    user_input = build_soap_note_input(
+        case=case,
+        differentials=differentials,
+        plan=plan,
+        safety_context=safety_context,
+    )
     client = OpenAI()
 
     try:

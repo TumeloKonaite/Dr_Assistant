@@ -71,6 +71,7 @@ def test_run_documentation_composes_soap_and_patient_summary():
     care_plan = make_care_plan()
     soap_note = make_soap_note()
     patient_summary = make_patient_summary()
+    safety_context = "Urgent red flags detected: Fainting."
 
     with patch(
         "src.agents.documentation_agent.generate_soap",
@@ -79,7 +80,12 @@ def test_run_documentation_composes_soap_and_patient_summary():
         "src.agents.documentation_agent.generate_patient_summary",
         return_value=patient_summary,
     ) as mock_generate_patient_summary:
-        result = run_documentation(case, differentials, care_plan)
+        result = run_documentation(
+            case,
+            differentials,
+            care_plan,
+            safety_context=safety_context,
+        )
 
     assert isinstance(result, DocumentationBundle)
     assert result.soap_note == soap_note
@@ -88,5 +94,10 @@ def test_run_documentation_composes_soap_and_patient_summary():
         case=case,
         differentials=differentials,
         plan=care_plan,
+        safety_context=safety_context,
     )
-    mock_generate_patient_summary.assert_called_once_with(case=case, plan=care_plan)
+    mock_generate_patient_summary.assert_called_once_with(
+        case=case,
+        plan=care_plan,
+        safety_context=safety_context,
+    )
