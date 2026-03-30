@@ -15,9 +15,19 @@ def run_documentation(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
     plan: CarePlan,
+    safety_context: str | None = None,
 ) -> DocumentationBundle:
-    soap_note = generate_soap(case=case, differentials=differentials, plan=plan)
-    patient_summary = generate_patient_summary(case=case, plan=plan)
+    soap_note = generate_soap(
+        case=case,
+        differentials=differentials,
+        plan=plan,
+        safety_context=safety_context,
+    )
+    patient_summary = generate_patient_summary(
+        case=case,
+        plan=plan,
+        safety_context=safety_context,
+    )
     return DocumentationBundle(
         soap_note=soap_note,
         patient_summary=patient_summary,
@@ -29,12 +39,18 @@ def documentation_tool(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
     plan: CarePlan,
+    safety_context: str | None = None,
 ) -> DocumentationBundle:
     """
     Generate clinician- and patient-facing documentation from structured
     clinical reasoning outputs.
     """
-    return run_documentation(case, differentials, plan)
+    return run_documentation(
+        case,
+        differentials,
+        plan,
+        safety_context=safety_context,
+    )
 
 
 documentation_agent = Agent(

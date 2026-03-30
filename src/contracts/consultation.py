@@ -4,6 +4,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 Likelihood = Literal["high", "moderate", "lower"]
+SafetySeverity = Literal["warning", "blocker"]
+RedFlagUrgency = Literal["urgent", "emergent"]
+EvidenceLevel = Literal["sparse", "limited", "adequate"]
+ConfidenceAlignment = Literal["aligned", "overstated"]
+SafetyStatus = Literal["clear", "warning", "blocked"]
 
 
 class ContractModel(BaseModel):
@@ -198,12 +203,113 @@ class DocumentationBundle(ContractModel):
     )
 
 
+class DetectedRedFlag(ContractModel):
+    code: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    summary: str = Field(min_length=1)
+    urgency: RedFlagUrgency
+    evidence: list[str] = Field(default_factory=list)
+    patient_summary_terms: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "code": "cardiopulmonary_emergency",
+                "title": "Chest pain with dyspnea or syncope",
+                "summary": "Chest pain plus shortness of breath or fainting can reflect a time-sensitive cardiopulmonary emergency.",
+                "urgency": "emergent",
+                "evidence": ["chest pain", "shortness of breath"],
+                "patient_summary_terms": [
+                    "chest pain",
+                    "shortness of breath",
+                    "fainting",
+                ],
+            }
+        }
+    )
+
+
+class SafetyIssue(ContractModel):
+    code: str = Field(min_length=1)
+    severity: SafetySeverity
+    source: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    evidence: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "code": "definitive_diagnosis_claim",
+                "severity": "blocker",
+                "source": "patient_summary",
+                "message": "Generated output states a definitive diagnosis that is not supported by the structured evidence.",
+                "evidence": ["The patient has pneumonia."],
+            }
+        }
+    )
+
+
+class UncertaintyAssessment(ContractModel):
+    evidence_level: EvidenceLevel
+    confidence_alignment: ConfidenceAlignment
+    explicit_uncertainty_present: bool
+    missing_information_documented: bool
+    supported_high_likelihood_differentials: bool
+    summary: str = Field(min_length=1)
+    issues: list[SafetyIssue] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "evidence_level": "limited",
+                "confidence_alignment": "aligned",
+                "explicit_uncertainty_present": True,
+                "missing_information_documented": True,
+                "supported_high_likelihood_differentials": True,
+                "summary": "The case has limited evidence, but the reasoning keeps uncertainty explicit and documents missing data.",
+                "issues": [],
+            }
+        }
+    )
+
+
+class SafetyReport(ContractModel):
+    status: SafetyStatus
+    red_flags: list[DetectedRedFlag] = Field(default_factory=list)
+    red_flag_summary: str = Field(min_length=1)
+    issues: list[SafetyIssue] = Field(default_factory=list)
+    uncertainty_assessment: UncertaintyAssessment
+    warning_count: int = Field(ge=0)
+    blocker_count: int = Field(ge=0)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "warning",
+                "red_flags": [
+                    DetectedRedFlag.model_config["json_schema_extra"]["example"],
+                ],
+                "red_flag_summary": "Urgent red flags detected: Chest pain with dyspnea or syncope.",
+                "issues": [
+                    SafetyIssue.model_config["json_schema_extra"]["example"],
+                ],
+                "uncertainty_assessment": UncertaintyAssessment.model_config[
+                    "json_schema_extra"
+                ]["example"],
+                "warning_count": 0,
+                "blocker_count": 1,
+            }
+        }
+    )
+
+
 class FinalConsultationBundle(ContractModel):
     case: ConsultationCase
     differentials: list[DifferentialDiagnosis] = Field(default_factory=list)
     care_plan: CarePlan
     soap_note: SoapNote
     patient_summary: PatientSummary
+    safety: SafetyReport | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -232,6 +338,7 @@ class FinalConsultationBundle(ContractModel):
                 "patient_summary": PatientSummary.model_config["json_schema_extra"][
                     "example"
                 ],
+                "safety": SafetyReport.model_config["json_schema_extra"]["example"],
             }
         }
     )

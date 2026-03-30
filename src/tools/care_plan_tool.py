@@ -36,6 +36,7 @@ def load_care_plan_prompt() -> str:
 def build_care_plan_input(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
+    safety_context: str | None = None,
 ) -> str:
     differential_payload: list[dict] | str
     if differentials:
@@ -43,28 +44,43 @@ def build_care_plan_input(
     else:
         differential_payload = "No differential diagnoses were provided."
 
-    return "\n".join(
-        [
-            "CONSULTATION CASE",
-            "-----------------",
-            json.dumps(case.model_dump(mode="json"), indent=2),
-            "",
-            "DIFFERENTIAL DIAGNOSIS LIST",
-            "---------------------------",
-            json.dumps(differential_payload, indent=2)
-            if isinstance(differential_payload, list)
-            else differential_payload,
-        ]
-    )
+    sections = [
+        "CONSULTATION CASE",
+        "-----------------",
+        json.dumps(case.model_dump(mode="json"), indent=2),
+        "",
+        "DIFFERENTIAL DIAGNOSIS LIST",
+        "---------------------------",
+        json.dumps(differential_payload, indent=2)
+        if isinstance(differential_payload, list)
+        else differential_payload,
+    ]
+
+    if safety_context:
+        sections.extend(
+            [
+                "",
+                "SAFETY CONTEXT",
+                "--------------",
+                safety_context,
+            ]
+        )
+
+    return "\n".join(sections)
 
 
 def generate_care_plan(
     case: ConsultationCase,
     differentials: list[DifferentialDiagnosis],
+    safety_context: str | None = None,
     model: str = "gpt-5-nano",
 ) -> CarePlan:
     system_prompt = load_care_plan_prompt()
-    user_input = build_care_plan_input(case=case, differentials=differentials)
+    user_input = build_care_plan_input(
+        case=case,
+        differentials=differentials,
+        safety_context=safety_context,
+    )
     client = OpenAI()
 
     try:

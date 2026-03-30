@@ -52,6 +52,17 @@ def test_build_patient_summary_input_includes_case_and_plan():
     assert '"suggested_tests": [' in payload
 
 
+def test_build_patient_summary_input_includes_safety_context_when_provided():
+    payload = build_patient_summary_input(
+        make_case(),
+        make_care_plan(),
+        safety_context="Urgent red flags detected: Possible gastrointestinal bleeding.",
+    )
+
+    assert "SAFETY CONTEXT" in payload
+    assert "Possible gastrointestinal bleeding" in payload
+
+
 def test_generate_patient_summary_returns_typed_contract():
     fake_response = Mock()
     fake_response.output_parsed = PatientSummaryResponse(

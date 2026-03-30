@@ -7,10 +7,13 @@ from typing import Callable, TypeVar
 
 from src.agents.documentation_agent import run_documentation
 from src.agents.planner_agent import run_planner
-from src.contracts.consultation import FinalConsultationBundle
+from src.contracts.consultation import FinalConsultationBundle, SafetyIssue, SafetyReport
 from src.tools.case_extraction_tool import extract_consultation_case
 from src.tools.illness_retrieval_tool import retrieve_conditions
+from src.tools.red_flag_detector_tool import detect_red_flags, summarize_red_flags
 from src.tools.transcription_tool import transcribe_consultation
+from src.tools.uncertainty_calibration_tool import assess_uncertainty
+from src.tools.unsafe_output_checker import check_generated_outputs
 from src.utils.logging import get_logger
 from src.utils.output_writer import (
     ensure_output_dir,
@@ -58,6 +61,27 @@ def _run_step(step: str, action: Callable[[], T]) -> T:
 
     logger.info("step=%s status=completed", step)
     return result
+
+
+def _build_safety_report(
+    red_flags,
+    unsafe_issues: list[SafetyIssue],
+    uncertainty_assessment,
+) -> SafetyReport:
+    issues = [*unsafe_issues, *uncertainty_assessment.issues]
+    blocker_count = sum(1 for issue in issues if issue.severity == "blocker")
+    warning_count = sum(1 for issue in issues if issue.severity == "warning")
+    status = "blocked" if blocker_count else "warning" if warning_count else "clear"
+
+    return SafetyReport(
+        status=status,
+        red_flags=red_flags,
+        red_flag_summary=summarize_red_flags(red_flags),
+        issues=issues,
+        uncertainty_assessment=uncertainty_assessment,
+        warning_count=warning_count,
+        blocker_count=blocker_count,
+    )
 
 
 def run_post_consultation_pipeline(
@@ -114,6 +138,12 @@ def run_post_consultation_pipeline(
         }
         write_json_output(metadata_path, metadata)
 
+        red_flags = _run_step(
+            "red_flag_detection",
+            lambda: detect_red_flags(case),
+        )
+        safety_context = summarize_red_flags(red_flags)
+
         retrieved = _run_step(
             "retrieval",
             lambda: retrieve_conditions(case),
@@ -130,7 +160,7 @@ def run_post_consultation_pipeline(
 
         reasoning = _run_step(
             "clinical_reasoning",
-            lambda: run_planner(case, retrieved),
+            lambda: run_planner(case, retrieved, safety_context=safety_context),
         )
         differentials_path = write_json_output(
             resolved_output_dir / "differentials.json",
@@ -146,7 +176,12 @@ def run_post_consultation_pipeline(
 
         documentation = _run_step(
             "documentation",
-            lambda: run_documentation(case, reasoning.differentials, reasoning.care_plan),
+            lambda: run_documentation(
+                case,
+                reasoning.differentials,
+                reasoning.care_plan,
+                safety_context=safety_context,
+            ),
         )
         soap_path = write_text_output(
             resolved_output_dir / "soap.md",
@@ -162,12 +197,46 @@ def run_post_consultation_pipeline(
             "patient_summary": str(patient_summary_path.resolve()),
         }
 
+        unsafe_issues = _run_step(
+            "unsafe_output_check",
+            lambda: check_generated_outputs(
+                case=case,
+                differentials=reasoning.differentials,
+                care_plan=reasoning.care_plan,
+                soap_note=documentation.soap_note,
+                patient_summary=documentation.patient_summary,
+                detected_red_flags=red_flags,
+            ),
+        )
+        uncertainty_assessment = _run_step(
+            "uncertainty_calibration",
+            lambda: assess_uncertainty(case, reasoning.differentials),
+        )
+        safety_report = _build_safety_report(
+            red_flags=red_flags,
+            unsafe_issues=unsafe_issues,
+            uncertainty_assessment=uncertainty_assessment,
+        )
+        safety_path = write_json_output(resolved_output_dir / "safety.json", safety_report)
+        metadata["artifacts"] = {
+            **metadata["artifacts"],
+            "safety": str(safety_path.resolve()),
+        }
+
+        if safety_report.blocker_count:
+            write_json_output(metadata_path, metadata)
+            blocker_messages = "; ".join(
+                issue.message for issue in safety_report.issues if issue.severity == "blocker"
+            )
+            raise PipelineStepError("safety_guardrails", blocker_messages)
+
         bundle = FinalConsultationBundle(
             case=case,
             differentials=reasoning.differentials,
             care_plan=reasoning.care_plan,
             soap_note=documentation.soap_note,
             patient_summary=documentation.patient_summary,
+            safety=safety_report,
         )
         final_bundle_path = write_json_output(
             resolved_output_dir / "final_bundle.json",
