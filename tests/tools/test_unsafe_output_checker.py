@@ -85,6 +85,24 @@ def test_check_generated_outputs_blocks_definitive_diagnosis_wording():
     assert any(issue.severity == "blocker" for issue in issues)
 
 
+def test_check_generated_outputs_allows_history_of_condition_wording():
+    issues = check_generated_outputs(
+        case=make_case(),
+        differentials=make_differentials(
+            reasoning=(
+                "The patient has a history of hypertension, which keeps "
+                "pneumonia on the broader differential only if respiratory "
+                "symptoms evolve."
+            )
+        ),
+        care_plan=make_care_plan(),
+        soap_note=make_soap_note(),
+        patient_summary=make_patient_summary(),
+    )
+
+    assert not any(issue.code == "definitive_diagnosis_claim" for issue in issues)
+
+
 def test_check_generated_outputs_blocks_invented_objective_findings():
     issues = check_generated_outputs(
         case=make_case(),
@@ -97,6 +115,60 @@ def test_check_generated_outputs_blocks_invented_objective_findings():
     assert any(issue.code == "invented_objective_data" for issue in issues)
 
 
+def test_check_generated_outputs_allows_source_supported_home_bp_readings():
+    case = ConsultationCase(
+        chief_complaint="Blood pressure follow-up",
+        symptoms=["headache"],
+        transcript=(
+            "Patient reports headaches for two weeks and home blood pressure "
+            "readings around 138/86 while taking amlodipine."
+        ),
+    )
+
+    issues = check_generated_outputs(
+        case=case,
+        differentials=make_differentials(
+            reasoning=(
+                "Headache symptoms have been present for about two weeks in the "
+                "context of ongoing blood pressure follow-up while on amlodipine. "
+                "Home readings around 138/86 suggest suboptimal control, which "
+                "can be associated with headaches in some individuals."
+            )
+        ),
+        care_plan=make_care_plan(),
+        soap_note=make_soap_note(),
+        patient_summary=make_patient_summary(),
+    )
+
+    assert not any(issue.code == "invented_objective_data" for issue in issues)
+
+
+def test_check_generated_outputs_allows_slash_format_when_source_uses_over():
+    case = ConsultationCase(
+        chief_complaint="Blood pressure follow-up",
+        symptoms=["headache"],
+        transcript=(
+            "Patient reports home blood pressure around 138 over 86 while on "
+            "amlodipine."
+        ),
+    )
+
+    issues = check_generated_outputs(
+        case=case,
+        differentials=make_differentials(
+            reasoning=(
+                "Patient reports home blood pressure readings around 138/86 with "
+                "occasional elevations during stress."
+            )
+        ),
+        care_plan=make_care_plan(),
+        soap_note=make_soap_note(),
+        patient_summary=make_patient_summary(),
+    )
+
+    assert not any(issue.code == "invented_objective_data" for issue in issues)
+
+
 def test_check_generated_outputs_blocks_medication_or_dosing_instructions():
     issues = check_generated_outputs(
         case=make_case(),
@@ -107,6 +179,23 @@ def test_check_generated_outputs_blocks_medication_or_dosing_instructions():
     )
 
     assert any(issue.code == "medication_or_dosing_instruction" for issue in issues)
+
+
+def test_check_generated_outputs_allows_descriptive_medication_mentions():
+    issues = check_generated_outputs(
+        case=make_case(),
+        differentials=make_differentials(
+            reasoning=(
+                "Use of paracetamol for headache is consistent with self-management "
+                "of mild-to-moderate symptoms."
+            )
+        ),
+        care_plan=make_care_plan(),
+        soap_note=make_soap_note(),
+        patient_summary=make_patient_summary(),
+    )
+
+    assert not any(issue.code == "medication_or_dosing_instruction" for issue in issues)
 
 
 def test_check_generated_outputs_blocks_unsupported_treatment_or_disposition_commands():

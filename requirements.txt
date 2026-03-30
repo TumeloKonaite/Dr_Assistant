@@ -13,8 +13,10 @@ openai-agents
 pandas
 plotly
 python-dotenv
+python-multipart
 scikit-learn
 sentence-transformers
 tiktoken
 ipykernel
 pytest
+uvicorn

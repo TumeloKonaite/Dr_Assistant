@@ -20,6 +20,9 @@ wheels/
 .pytest_tmp/
 /pytest-cache-files-*/
 /tmp*/
+/node_modules/
+/frontend/node_modules/
+/frontend/dist/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -29,6 +32,7 @@ wheels/
 /data/chunks/
 /data/input/
 /data/output/
+/outputs/
 /notebooks/meeting_chunks/
 /notebooks/output.mp3
 /notebooks/normalized.wav

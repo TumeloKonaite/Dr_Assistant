@@ -19,10 +19,12 @@ dependencies = [
     "pandas",
     "plotly",
     "pydantic",
+    "python-multipart",
     "python-dotenv",
     "scikit-learn",
     "sentence-transformers",
     "tiktoken",
+    "uvicorn",
 ]
 
 [dependency-groups]
@@ -33,3 +35,15 @@ dev = [
 
 [tool.pytest.ini_options]
 addopts = "-p no:cacheprovider"
+testpaths = ["tests"]
+norecursedirs = [
+    ".git",
+    ".venv",
+    ".pytest_cache",
+    ".pytest_tmp",
+    ".tmp",
+    "node_modules",
+    "frontend",
+    "pytest-cache-files-*",
+    "tmp*",
+]
