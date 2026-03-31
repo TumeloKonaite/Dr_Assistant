@@ -60,9 +60,9 @@ Final Consultation Bundle
 ## Repository Entry Points
 
 - `src/cli.py`: unified CLI with `analyze`, `transcribe`, and `build-kb` subcommands
+- `src/rag/build_kb_artifacts.py`: knowledge-base artifact builder implementation
 - `src/api/main.py`: FastAPI app with `/health` and `/analyze`
 - `frontend/`: React + Vite frontend
-- `run_pipeline.py`, `main.py`, and `build_kb_artifacts.py`: compatibility wrappers over `src/cli.py`
 
 ## Requirements
 
@@ -206,18 +206,6 @@ outputs/<timestamp>/
 ```
 
 `metadata.json` tracks run status, timestamps, input path, output directory, and artifact locations.
-
-## Compatibility Wrappers
-
-The repo still includes legacy wrapper scripts for backward compatibility:
-
-```powershell
-python run_pipeline.py --file "Zeno Minutes.mp4" --notes ".\doctor_notes.txt"
-python main.py --input "Zeno Minutes.mp4"
-python build_kb_artifacts.py
-```
-
-These wrappers delegate to `src/cli.py` so the actual CLI behavior stays in one place.
 
 ## Testing
 

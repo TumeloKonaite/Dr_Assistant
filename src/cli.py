@@ -5,7 +5,6 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from src.pipelines.build_kb_artifacts import main as build_kb_artifacts_main
 from src.pipelines.legacy_transcription_pipeline import (
     run_legacy_transcription_pipeline,
 )
@@ -13,6 +12,7 @@ from src.pipelines.post_consultation_pipeline import (
     build_output_dir_path,
     run_post_consultation_pipeline,
 )
+from src.rag.build_kb_artifacts import main as build_kb_artifacts_main
 
 
 def load_doctor_notes(notes_path: str) -> str:
