@@ -1,87 +1,102 @@
-﻿
-# 🩺 Dr_Assistant
+# Dr_Assistant
 
 [![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-transcription%20%2B%20reasoning-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-typed%20contracts-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
 [![Pytest](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](#-license)
 
-Dr_Assistant is a modular transcription and post-consultation pipeline designed for clinical workflows.  
-It converts audio/video consultations into clean transcripts and forms the foundation for downstream AI-powered medical reasoning (case extraction, retrieval, differential diagnosis, and documentation).
+Dr_Assistant is a clinical post-consultation pipeline for turning consultation audio or video into structured reasoning and documentation artifacts. The current repo includes a canonical CLI pipeline, a FastAPI backend, and a React frontend for local development.
 
----
+## What It Does
 
-## 🚀 Overview
+The canonical workflow takes:
 
-The current system focuses on **robust, reusable transcription** as the first stage of a larger clinical assistant pipeline.
+- a consultation media file
+- optional or required doctor notes, depending on how you invoke it
 
-### Core capabilities
+It produces:
 
-- 🎧 Audio normalization using `ffmpeg`
-- ✂️ Intelligent chunking with overlap using `moviepy`
-- 🧠 High-quality transcription via OpenAI APIs
-- 🔗 Deterministic transcript merging
-- 📂 Structured output artifacts for downstream pipelines
+- a transcript
+- a structured consultation case
+- retrieved clinical candidates
+- differential diagnoses
+- a care plan
+- a SOAP note
+- a patient summary
+- a safety report
+- a final JSON bundle
 
----
-
-## 🧱 Architecture
-
-The pipeline is designed as a **reusable, composable module**, not just a script.
+## Pipeline Overview
 
 ```text
 Media File
-   ↓
-[Normalization] → ffmpeg
-   ↓
-[Chunking] → moviepy
-   ↓
-[Transcription] → OpenAI
-   ↓
-[Merging]
-   ↓
-Transcript (.txt)
-````
+   |
+   v
+Transcription
+   |
+   v
+Case Extraction
+   |
+   v
+Red Flag Detection
+   |
+   v
+Retrieval
+   |
+   v
+Clinical Reasoning
+   |
+   v
+Documentation
+   |
+   v
+Safety Guardrails
+   |
+   v
+Final Consultation Bundle
+```
 
-This modular design allows the transcription layer to plug into:
+## Repository Entry Points
 
-* Case extraction agents
-* Retrieval (RAG) systems
-* Clinical reasoning pipelines
-* API services (FastAPI)
-* Frontend applications
+- `src/cli.py`: unified CLI with `analyze`, `transcribe`, and `build-kb` subcommands
+- `src/api/main.py`: FastAPI app with `/health` and `/analyze`
+- `frontend/`: React + Vite frontend
+- `run_pipeline.py`, `main.py`, and `build_kb_artifacts.py`: compatibility wrappers over `src/cli.py`
 
----
+## Requirements
 
-## 📦 Supported Inputs
+- Python `3.12+`
+- Node.js and npm for the frontend
+- `ffmpeg` available on `PATH`
+- `OPENAI_API_KEY` set in your environment
 
-* Video: `.mp4`, `.mov`, `.avi`, `.mkv`
-* Audio: `.mp3`, `.wav`, `.aac`, `.flac`, `.ogg`
+## Installation
 
----
-
-## ⚙️ Requirements
-
-* Python **3.12+**
-* `ffmpeg` installed and available on `PATH`
-* OpenAI API key
-
----
-
-## 🔧 Installation
-
-Clone the repository and install dependencies:
+Install Python dependencies from the repo root:
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-Activate virtual environment (recommended):
+To install the package in editable mode and register the `dr-assistant` CLI:
 
 ```powershell
+pip install -e .
+```
+
+Install the native runtime tools separately and ensure this command resolves on your shell `PATH`:
+
+```powershell
+ffmpeg -version
+```
+
+If you use a virtual environment:
+
+```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
 Set your OpenAI API key:
@@ -90,122 +105,130 @@ Set your OpenAI API key:
 setx OPENAI_API_KEY "your_api_key_here"
 ```
 
----
+Open a new shell after `setx` so the variable is available to the app.
 
-## ▶️ Usage
+## Canonical CLI Usage
 
-Run the pipeline from the project root:
+The unified CLI lives in `src/cli.py`. You can invoke it either through the installed `dr-assistant` command or through `python -m src.cli`.
 
 ```powershell
+python -m src.cli analyze --file "Zeno Minutes.mp4" --notes ".\doctor_notes.txt"
+```
+
+To control where artifacts are written:
+
+```powershell
+python -m src.cli analyze --file "Zeno Minutes.mp4" --notes ".\doctor_notes.txt" --output-dir ".\outputs\demo_run"
+```
+
+By default, the pipeline writes artifacts to a timestamped directory under `outputs/`, for example:
+
+```text
+outputs/20260330_153739/
+```
+
+If you installed the package with `pip install -e .`, the equivalent command is:
+
+```powershell
+dr-assistant analyze --file "Zeno Minutes.mp4" --notes ".\doctor_notes.txt"
+```
+
+## Other CLI Commands
+
+Legacy transcription-only workflow:
+
+```powershell
+python -m src.cli transcribe --input "Zeno Minutes.mp4"
+```
+
+Knowledge-base artifact build:
+
+```powershell
+python -m src.cli build-kb
+```
+
+## API Usage
+
+Start the backend from the repo root:
+
+```powershell
+uvicorn src.api.main:app --reload
+```
+
+Available endpoints:
+
+- `GET /health`
+- `POST /analyze`
+
+`POST /analyze` accepts:
+
+- `file`: uploaded consultation media
+- `notes`: form field containing doctor notes text
+
+The response model is `FinalConsultationBundle`.
+
+## Frontend Usage
+
+The frontend lives in `frontend/`, not the repo root.
+
+Start the frontend dev server like this:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+If PowerShell blocks `npm`, use:
+
+```powershell
+npm.cmd run dev
+```
+
+The Vite app proxies `/analyze` and `/health` to `http://127.0.0.1:8000`.
+
+## Output Artifacts
+
+A successful post-consultation run writes files like these:
+
+```text
+outputs/<timestamp>/
+- case.json
+- differentials.json
+- final_bundle.json
+- metadata.json
+- patient_summary.md
+- plan.json
+- retrieved.json
+- safety.json
+- soap.md
+- transcript.txt
+```
+
+`metadata.json` tracks run status, timestamps, input path, output directory, and artifact locations.
+
+## Compatibility Wrappers
+
+The repo still includes legacy wrapper scripts for backward compatibility:
+
+```powershell
+python run_pipeline.py --file "Zeno Minutes.mp4" --notes ".\doctor_notes.txt"
 python main.py --input "Zeno Minutes.mp4"
+python build_kb_artifacts.py
 ```
 
-Or with an absolute path:
+These wrappers delegate to `src/cli.py` so the actual CLI behavior stays in one place.
 
-```powershell
-python main.py --input "C:\path\to\file.mp4"
-```
+## Testing
 
----
-
-## 📤 Outputs
-
-All outputs are written to:
-
-```text
-data/output/
-```
-
-### Generated artifacts
-
-| Artifact                | Description                       |
-| ----------------------- | --------------------------------- |
-| `<file>_normalized.wav` | Normalized audio (if disk allows) |
-| `chunks/`               | Intermediate audio chunks         |
-| `<file>_transcript.txt` | Final merged transcript           |
-
-### Example
-
-```text
-data/output/Zeno Minutes_transcript.txt
-```
-
----
-
-## ⚠️ Fault Tolerance
-
-The pipeline is designed to **fail gracefully**:
-
-* If normalization fails due to disk constraints:
-
-  * ✅ Falls back to chunking the original media
-  * ❌ Does NOT terminate the pipeline
-
-This ensures robustness in constrained environments.
-
----
-
-## 🧪 Testing
-
-Run all tests:
+Run the test suite from the repo root:
 
 ```powershell
 python -m pytest tests -v
 ```
 
----
+## Notes
 
-## 🧩 Roadmap
-
-This repository is evolving into a full **AI-powered post-consultation system**.
-
-### Planned pipeline stages
-
-1. ✅ Transcription (current)
-2. 🔜 Case extraction (structured clinical data)
-3. 🔜 Illness retrieval (RAG)
-4. 🔜 Differential diagnosis generation
-5. 🔜 Care plan recommendation
-6. 🔜 SOAP notes + patient summaries
-7. 🔜 API + frontend integration
-
----
-
-## 🧠 Design Principles
-
-* **Modular** → each step is independently reusable
-* **Deterministic outputs** → consistent file structure
-* **Typed contracts (Pydantic)** → safe integration across layers
-* **Thin orchestration** → logic lives in tools, not pipelines
-* **Production-ready** → logging, testing, fault tolerance
-
----
-
-## 📌 Example Use Cases
-
-* Clinical consultation transcription
-* Medical AI assistants
-* Meeting transcription pipelines
-* Dataset generation for ASR/LLM systems
-* RAG-based healthcare applications
-
----
-
-## 🤝 Contributing
-
-PRs are structured as **small, focused improvements** aligned with pipeline stages.
-
----
-
-## 📄 License
-
-MIT License (or specify your license here)
-
----
-
-## 👤 Author
-
-Built by **Tumelo Konaite**
-AI Engineer | Machine Learning Engineer | Quantitative Specialist
-
----
+- Safety guardrails can block final output generation if the system detects unsupported or unsafe claims.
+- The API returns structured safety errors for blocked runs.
+- Generated markdown artifacts are intended for review, not as definitive medical advice.

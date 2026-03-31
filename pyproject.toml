@@ -27,6 +27,9 @@ dependencies = [
     "uvicorn",
 ]
 
+[project.scripts]
+dr-assistant = "src.cli:main"
+
 [dependency-groups]
 dev = [
     "ipykernel",

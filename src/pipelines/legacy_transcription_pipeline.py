@@ -10,7 +10,9 @@ def _clear_existing_chunks(chunks_dir: Path) -> None:
         chunk_file.unlink()
 
 
-def run_full_pipeline(input_file: str, output_dir: str = "data/output") -> str:
+def run_legacy_transcription_pipeline(
+    input_file: str, output_dir: str = "data/output"
+) -> str:
     input_path = Path(input_file)
     if not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_file}")
@@ -35,7 +37,9 @@ def run_full_pipeline(input_file: str, output_dir: str = "data/output") -> str:
     except RuntimeError as exc:
         if "No space left on device" not in str(exc):
             raise
-        print("Normalization skipped: insufficient disk space for WAV output. Chunking source media directly...")
+        print(
+            "Normalization skipped: insufficient disk space for WAV output. Chunking source media directly..."
+        )
 
     print("Chunking audio...")
     chunk_audio(chunk_source, output_dir=str(chunks_dir))

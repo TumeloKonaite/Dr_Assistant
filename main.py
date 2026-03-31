@@ -1,15 +1,15 @@
-import argparse
-from src.pipelines.run_full_pipeline import run_full_pipeline
+from src.cli import run_transcribe_command
+from src.pipelines.legacy_transcription_pipeline import (
+    run_legacy_transcription_pipeline,
+)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True)
-
-    args = parser.parse_args()
-
-    run_full_pipeline(args.input)
+def main(argv: list[str] | None = None) -> int:
+    return run_transcribe_command(
+        argv,
+        run_transcription_pipeline_fn=run_legacy_transcription_pipeline,
+    )
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
