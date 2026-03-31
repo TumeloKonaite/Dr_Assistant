@@ -29,9 +29,12 @@ wheels/
 !/notebooks/*.ipynb
 
 # Local data and generated media
-/data/chunks/
-/data/input/
-/data/output/
+/data/input/*
+!/data/input/Symptom2Disease.csv
+/data/output/*
+!/data/output/kb.pkl
+!/data/output/kb_texts.pkl
+!/data/output/kb_embeddings.pt
 /outputs/
 /notebooks/meeting_chunks/
 /notebooks/output.mp3

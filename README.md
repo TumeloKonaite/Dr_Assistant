@@ -107,6 +107,25 @@ setx OPENAI_API_KEY "your_api_key_here"
 
 Open a new shell after `setx` so the variable is available to the app.
 
+## Knowledge Base Assets
+
+The repository tracks the canonical retrieval dataset and the generated KB artifacts:
+
+- `data/input/Symptom2Disease.csv`
+- `data/output/kb.pkl`
+- `data/output/kb_texts.pkl`
+- `data/output/kb_embeddings.pt`
+
+Other files under `data/output/` are treated as local generated artifacts and remain ignored.
+
+If you update `data/input/Symptom2Disease.csv`, regenerate the KB artifacts with:
+
+```powershell
+python -m src.cli build-kb
+```
+
+The build reads `data/input/Symptom2Disease.csv` and rewrites the three files in `data/output/`. On a fresh environment, the embedding model may be downloaded the first time this command runs.
+
 ## Canonical CLI Usage
 
 The unified CLI lives in `src/cli.py`. You can invoke it either through the installed `dr-assistant` command or through `python -m src.cli`.
@@ -146,6 +165,8 @@ Knowledge-base artifact build:
 ```powershell
 python -m src.cli build-kb
 ```
+
+This rebuilds `data/output/kb.pkl`, `data/output/kb_texts.pkl`, and `data/output/kb_embeddings.pt` from `data/input/Symptom2Disease.csv`.
 
 ## API Usage
 
