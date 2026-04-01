@@ -350,3 +350,5 @@ The workflow intentionally separates:
 - safety review
 
 That separation makes the pipeline easier to validate, test, and inspect. It also reduces the risk of collapsing everything into one opaque generation step.
+
+For the agent-level view of those stage boundaries, see [agents.md](agents.md).

@@ -101,6 +101,7 @@ python -m src.cli analyze --file "path\to\consultation.mp4" --notes "path\to\doc
 - [docs/getting-started.md](docs/getting-started.md): setup, environment, and installation
 - [docs/running-the-project.md](docs/running-the-project.md): CLI, API, frontend, Docker, and Make usage
 - [docs/data-and-artifacts.md](docs/data-and-artifacts.md): knowledge-base assets and pipeline outputs
+- [docs/agents.md](docs/agents.md): agent responsibilities and how they map to the pipeline
 - [docs/post-consultation-workflow.md](docs/post-consultation-workflow.md): stage-by-stage workflow explanation
 - [docs/testing.md](docs/testing.md): automated and workflow-focused testing
 - [docs/testing-with-synthetic-dataset.md](docs/testing-with-synthetic-dataset.md): synthetic dataset testing guide
