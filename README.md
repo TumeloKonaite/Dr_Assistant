@@ -57,6 +57,8 @@ Safety Guardrails
 Final Consultation Bundle
 ```
 
+For a full stage-by-stage explanation, see [docs/post-consultation-workflow.md](docs/post-consultation-workflow.md).
+
 ## Repository Entry Points
 
 - `src/cli.py`: unified CLI with `analyze`, `transcribe`, and `build-kb` subcommands
