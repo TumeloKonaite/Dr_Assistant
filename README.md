@@ -3,29 +3,31 @@
 [![Python](https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![OpenAI](https://img.shields.io/badge/OpenAI-transcription%20%2B%20reasoning-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
-[![Pydantic](https://img.shields.io/badge/Pydantic-typed%20contracts-E92063?logo=pydantic&logoColor=white)](https://docs.pydantic.dev/)
-[![Pytest](https://img.shields.io/badge/tests-pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 
-Dr_Assistant is a clinical post-consultation pipeline that turns consultation audio or video into structured reasoning and documentation artifacts. The repository includes a canonical Python CLI, a FastAPI backend, and a React frontend for local development.
+Dr_Assistant is a clinical post-consultation pipeline for transforming consultation audio or video into structured clinical artifacts for review.
 
 ## Overview
 
-The canonical pipeline takes:
-
-- a consultation media file
-- doctor notes text
-
-It produces:
+It combines:
 
 - a transcript
-- a structured consultation case
-- retrieved clinical candidates
+- structured case extraction
+- red flag detection
+- retrieval over a clinical knowledge base
 - differential diagnoses
 - a care plan
 - a SOAP note
 - a patient summary
-- a safety report
-- a final JSON consultation bundle
+- safety guardrails
+- final consultation bundle generation
+
+The repository includes:
+
+- a Python CLI for local runs
+- a FastAPI backend
+- a React frontend
+- typed contracts for pipeline artifacts
+- documentation for workflow, agents, data, testing, and operations
 
 ## Workflow
 
