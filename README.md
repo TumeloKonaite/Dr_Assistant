@@ -188,6 +188,35 @@ Available endpoints:
 
 The response model is `FinalConsultationBundle`.
 
+## Container Usage
+
+The repository includes a production-oriented backend `Dockerfile`, a local `docker-compose.yml`, and a root `Makefile` for common container workflows.
+
+With `OPENAI_API_KEY` set in your shell, start the stack from the repo root with:
+
+```powershell
+make up
+```
+
+Useful targets:
+
+- `make build`: build the API image
+- `make up`: start the API and frontend services
+- `make down`: stop the stack
+- `make logs`: follow logs for all services
+- `make api-logs`: follow API logs only
+- `make frontend-logs`: follow frontend logs only
+- `make api-shell`: open a shell in the API container
+- `make frontend-shell`: open a shell in the frontend container
+- `make kb`: build KB artifacts locally
+- `make transcribe FILE=path/to/media.mp4 [OUTPUT_DIR=outputs/transcribe]`: run the transcription pipeline locally
+- `make analyze FILE=path/to/media.mp4 NOTES=doctor_notes.txt [OUTPUT_DIR=outputs/demo_run]`: run the full analysis pipeline locally
+- `make docker-kb`: build KB artifacts in the API container
+- `make docker-transcribe FILE=path/to/media.mp4 [OUTPUT_DIR=outputs/transcribe]`: run the transcription pipeline in the API container
+- `make docker-analyze FILE=path/to/media.mp4 NOTES=doctor_notes.txt [OUTPUT_DIR=outputs/demo_run]`: run the full analysis pipeline in the API container
+
+The Compose API service now mounts the repository into `/app`, so Docker-backed pipeline runs can read repo files and write outputs back into the workspace.
+
 ## Frontend Usage
 
 The frontend lives in `frontend/`, not the repo root.
@@ -228,6 +257,12 @@ outputs/<timestamp>/
 
 `metadata.json` tracks run status, timestamps, input path, output directory, and artifact locations.
 
+## Testing With The Synthetic Consultation Dataset
+
+If you want a realistic synthetic consultation dataset for local testing, use the public Hugging Face dataset [`TumeloKonaite/synthetic-patient-dr-data`](https://huggingface.co/datasets/TumeloKonaite/synthetic-patient-dr-data).
+
+It currently exposes 50 synthetic doctor-patient consultations in a `train` split with structured JSONL rows plus full WAV consultation audio, transcript references, and manifests. A step-by-step download and exploration guide lives in [`docs/testing-with-synthetic-dataset.md`](docs/testing-with-synthetic-dataset.md).
+
 ## Testing
 
 Run the test suite from the repo root:
@@ -235,6 +270,23 @@ Run the test suite from the repo root:
 ```powershell
 python -m pytest tests -v
 ```
+
+## License And Legal Notice
+
+This repository is licensed under the Apache License 2.0. See `LICENSE`.
+
+Important boundary: an open-source license governs reuse of the codebase, but it does not exempt anyone from healthcare, privacy, medical device, consumer protection, professional practice, or other applicable laws and regulations.
+
+This project is intended as decision-support and documentation software for review by qualified humans. It is not a substitute for licensed clinical judgment, not legal advice, and should not be represented as regulatory clearance or compliance status.
+
+Before using this software with real patients, protected health information, or clinical workflows, assess at minimum:
+
+- privacy and security obligations such as HIPAA/HITECH where applicable
+- FDA or other medical-device / software-as-a-medical-device rules where applicable
+- local laws on clinical practice, consent, retention, and professional supervision
+- your own contractual, institutional, and cybersecurity requirements
+
+If you need an actual compliance position for a deployment, get advice from qualified healthcare/privacy/regulatory counsel.
 
 ## Notes
 
